@@ -1,0 +1,70 @@
+import { env } from "./config/env.js";
+import express from "express";
+import { prisma } from "./config/prisma.js";
+import morgan from "morgan";
+import { rootRouter } from "./routes/index.js";
+import { errorHandler, notFoundHandler } from "./common/errorHandler.js";
+
+const app = express();
+app.disable("x-powered-by");
+// Behind a real reverse proxy/load balancer in production, req.ip must come
+// from X-Forwarded-For, or every request looks like it came from the proxy —
+// which would make the rate limiters (keyed by req.ip) useless.
+if (env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
+app.use(express.json());
+app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
+
+app.get("/healthz", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.use(rootRouter);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// Crash intentionally on programmer errors that escape Express's request
+// lifecycle (e.g. a rejected promise in a timer/queue callback) instead of
+// continuing in a possibly-corrupted state — the process manager restarts us.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+  process.exit(1);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+  process.exit(1);
+});
+
+async function startServer() {
+  try {
+    await prisma.$connect();
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("Database connected successfully");
+
+    const server = app.listen(env.PORT, () => {
+      console.log(`Server running on http://localhost:${env.PORT}`);
+    });
+
+    const shutdown = async (signal: string) => {
+      console.log(`${signal} received, shutting down gracefully`);
+      server.close(async () => {
+        await prisma.$disconnect();
+        process.exit(0);
+      });
+      // Force-exit if connections don't drain in time.
+      setTimeout(() => process.exit(1), 10_000).unref();
+    };
+
+    process.on("SIGTERM", () => void shutdown("SIGTERM"));
+    process.on("SIGINT", () => void shutdown("SIGINT"));
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    process.exit(1);
+  }
+}
+
+startServer();

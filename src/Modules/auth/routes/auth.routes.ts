@@ -5,10 +5,7 @@ import { rateLimit } from "../../../common/rateLimit.js";
 
 export const authRoutes = Router();
 
-// IP-scoped guards in front of the phone-scoped limits already enforced in
-// auth.service.ts (see PRD §11C: "OTP 5/10 min per phone"). This stops one IP
-// from cycling through many phone numbers, which a per-phone limit alone
-// can't prevent.
+
 const otpSendLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 10,

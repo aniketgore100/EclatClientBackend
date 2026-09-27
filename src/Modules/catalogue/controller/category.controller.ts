@@ -3,8 +3,10 @@ import { categoryService } from "../service/category.service.js";
 import { requireParam } from "../../../common/params.js";
 
 export const categoryController = {
+ 
   async list(_req: Request, res: Response) {
     const categories = await categoryService.list();
+    console.log("categories :: ", categories);
     res.json({ data: categories });
   },
 
@@ -13,4 +15,6 @@ export const categoryController = {
     const category = await categoryService.getBySlug(slug);
     res.json({ data: category });
   },
+
+  
 };

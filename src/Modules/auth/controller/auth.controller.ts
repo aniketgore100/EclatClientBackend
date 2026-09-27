@@ -13,6 +13,7 @@ export const authController = {
   async requestOtp(req: Request, res: Response) {
     const { phone } = requestOtpSchema.parse(req.body);
     const result = await authService.requestOtp(phone);
+    console.log("result :: ", result)
     res.status(202).json({ data: result });
   },
 

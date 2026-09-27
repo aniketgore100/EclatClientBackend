@@ -1,5 +1,6 @@
 import { env } from "./config/env.js";
 import express from "express";
+import cors from "cors";
 import { prisma } from "./config/prisma.js";
 import morgan from "morgan";
 import { rootRouter } from "./routes/index.js";
@@ -7,13 +8,13 @@ import { errorHandler, notFoundHandler } from "./common/errorHandler.js";
 
 const app = express();
 app.disable("x-powered-by");
-// Behind a real reverse proxy/load balancer in production, req.ip must come
-// from X-Forwarded-For, or every request looks like it came from the proxy —
-// which would make the rate limiters (keyed by req.ip) useless.
+
 if (env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
+const corsOrigins = env.CORS_ORIGINS.split(",").map((origin) => origin.trim());
+app.use(cors({ origin: corsOrigins }));
 app.use(express.json());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
@@ -26,9 +27,7 @@ app.use(rootRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Crash intentionally on programmer errors that escape Express's request
-// lifecycle (e.g. a rejected promise in a timer/queue callback) instead of
-// continuing in a possibly-corrupted state — the process manager restarts us.
+
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled promise rejection:", reason);
   process.exit(1);
@@ -55,7 +54,6 @@ async function startServer() {
         await prisma.$disconnect();
         process.exit(0);
       });
-      // Force-exit if connections don't drain in time.
       setTimeout(() => process.exit(1), 10_000).unref();
     };
 

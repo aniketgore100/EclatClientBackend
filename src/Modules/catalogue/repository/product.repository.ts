@@ -2,10 +2,18 @@ import { prisma } from "../../../config/prisma.js";
 import type { ProductGetPayload } from "../../../generated/prisma/models.js";
 import type { ProductListQuery } from "../dto/product-query.dto.js";
 
+const facetSelects = {
+  type: { select: { slug: true, name: true } },
+  polish: { select: { slug: true, name: true } },
+  stone: { select: { slug: true, name: true } },
+  pearlColour: { select: { slug: true, name: true, hex: true } },
+} as const;
+
 const cardInclude = {
   category: { select: { slug: true, name: true } },
   images: { orderBy: { position: "asc" as const }, take: 2 },
   variants: { include: { inventory: true } },
+  ...facetSelects,
 } as const;
 
 const detailInclude = {
@@ -13,6 +21,8 @@ const detailInclude = {
   images: { orderBy: { position: "asc" as const } },
   optionTypes: true,
   variants: { include: { inventory: true, images: true } },
+  attributes: { orderBy: { position: "asc" as const } },
+  ...facetSelects,
   reviews: {
     where: { status: "APPROVED" as const },
     orderBy: { createdAt: "desc" as const },
@@ -33,9 +43,7 @@ export type ProductCard = ProductGetPayload<{ include: typeof cardInclude }>;
 export type ProductDetail = ProductGetPayload<{ include: typeof detailInclude }>;
 
 function buildWhere(filters: ProductListQuery) {
-  // Each condition below filters on a *different* variant, so they must be
-  // combined inside one `variants.some.AND`, not as separate `variants` keys
-  // (which would silently clobber each other via object spread).
+
   const variantConditions: Record<string, unknown>[] = [];
   if (filters.inStock) {
     variantConditions.push({ inventory: { onHand: { gt: 0 } } });
@@ -52,7 +60,14 @@ function buildWhere(filters: ProductListQuery) {
   return {
     status: "ACTIVE" as const,
     ...(filters.category ? { category: { slug: filters.category } } : {}),
+    ...(filters.type ? { type: { slug: filters.type } } : {}),
+    ...(filters.polish ? { polish: { slug: filters.polish } } : {}),
+    ...(filters.colour ? { pearlColour: { slug: filters.colour } } : {}),
+    ...(filters.stone ? { stone: { slug: filters.stone } } : {}),
+    ...(filters.occasion ? { occasions: { has: filters.occasion } } : {}),
     ...(filters.grade ? { pearlGrade: filters.grade } : {}),
+    // `setting` doubles as the metal/material facet (e.g. "925 Silver") —
+    // there is no separate metal column, see product.repository seed data.
     ...(filters.metal ? { setting: filters.metal } : {}),
     ...(filters.tag ? { tags: { has: filters.tag } } : {}),
     ...(filters.isNew ? { isNew: true } : {}),
@@ -61,9 +76,7 @@ function buildWhere(filters: ProductListQuery) {
 }
 
 export const productRepository = {
-  // Price-based sort is done in-memory below the DB layer since price lives on
-  // Variant, not Product — fine at ~40 SKUs; revisit with a denormalized
-  // `priceFrom` column if the catalogue grows into the hundreds.
+
   async list(filters: ProductListQuery): Promise<{ data: ProductCard[]; total: number }> {
     const where = buildWhere(filters);
 
@@ -116,5 +129,13 @@ export const productRepository = {
       include: cardInclude,
       take,
     });
+  },
+
+  // For homepage sections that reference specific products by id (chosen in
+  // the admin) — order isn't preserved by `id: { in }`, callers re-sort to
+  // match the admin's chosen order.
+  findByIds(ids: string[]): Promise<ProductCard[]> {
+    if (!ids.length) return Promise.resolve([]);
+    return prisma.product.findMany({ where: { id: { in: ids }, status: "ACTIVE" }, include: cardInclude });
   },
 };

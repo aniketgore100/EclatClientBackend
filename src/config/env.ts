@@ -5,20 +5,12 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().positive().default(3000),
+    // Comma-separated storefront origins allowed to call this API from a browser.
+    CORS_ORIGINS: z.string().default("http://localhost:8080,http://localhost:8081"),
 
-    // "password" = DATABASE_URL with an embedded password (local Postgres, or
-    // an RDS user with a static password). "iam" = no stored password at all —
-    // a short-lived token is signed per-connection via IAM (see DATABASE_HOST
-    // etc. below). Requires the DB user to have `GRANT rds_iam` and the
-    // calling IAM principal to have an rds-db:connect policy for that user.
     DATABASE_AUTH_MODE: z.enum(["password", "iam"]).default("password"),
     DATABASE_URL: z.string().min(1).optional(),
-    // "auto" = SSL (verified against Node's default trusted root store —
-    // covers RDS/Aurora certs issued by Amazon Trust Services) when
-    // NODE_ENV=production, off otherwise. "require" to test against RDS from
-    // a dev machine, "disable" for a local Postgres that doesn't speak SSL.
-    // Ignored (always on) when DATABASE_AUTH_MODE=iam — AWS requires SSL for
-    // IAM database auth.
+
     DATABASE_SSL: z.enum(["auto", "require", "disable"]).default("auto"),
 
     // Only used when DATABASE_AUTH_MODE=iam
@@ -26,10 +18,7 @@ const envSchema = z
     DATABASE_PORT: z.coerce.number().int().positive().default(5432),
     DATABASE_NAME: z.string().optional(),
     DATABASE_USER: z.string().optional(),
-    // Region the RDS/Aurora instance lives in — required to sign IAM auth
-    // tokens correctly. AWS credentials themselves are NOT an env var here:
-    // the AWS SDK's default provider chain (~/.aws/credentials, AWS_ACCESS_
-    // KEY_ID/AWS_SECRET_ACCESS_KEY, or an ECS/EC2 role) handles that.
+  
     AWS_REGION: z.string().optional(),
 
     JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),

@@ -2,6 +2,14 @@ import { z } from "zod";
 
 export const productListQuerySchema = z.object({
   category: z.string().optional(),
+  // Slugs of admin-managed ProductType/Polish/Stone/PearlColour rows —
+  // these are content, not a fixed enum, so any string is syntactically
+  // valid; a slug that matches no row just yields zero results.
+  type: z.string().optional(),
+  polish: z.string().optional(),
+  colour: z.string().optional(),
+  stone: z.string().optional(),
+  occasion: z.string().optional(),
   tag: z.string().optional(),
   grade: z.string().optional(),
   metal: z.string().optional(),

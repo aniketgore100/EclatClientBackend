@@ -2,7 +2,7 @@ import { productRepository, type ProductCard, type ProductDetail } from "../repo
 import { NotFoundError } from "../../../common/errors.js";
 import type { ProductListQuery } from "../dto/product-query.dto.js";
 
-function toCard(product: ProductCard) {
+export function toCard(product: ProductCard) {
   const prices = product.variants.map((v) => v.price);
   const mrps = product.variants.map((v) => v.mrp);
   const priceFrom = prices.length ? Math.min(...prices) : null;
@@ -22,6 +22,15 @@ function toCard(product: ProductCard) {
     tags: product.tags,
     isNew: product.isNew,
     grade: product.pearlGrade,
+    size: product.pearlSizeMm !== null ? `${product.pearlSizeMm} mm` : null,
+    metal: product.setting,
+    type: product.type?.name ?? null,
+    polish: product.polish?.name ?? null,
+    colour: product.pearlColour?.name ?? null,
+    colourHex: product.pearlColour?.hex ?? null,
+    stone: product.stone?.name ?? "No stone",
+    occasions: product.occasions,
+    sold: product.displaySoldCount,
     priceFrom,
     mrpFrom,
     discountPct:
@@ -47,11 +56,21 @@ function toDetail(product: ProductDetail, related: ProductCard[]) {
     tags: product.tags,
     codAllowed: product.codAllowed,
     insured: product.insured,
+    grade: product.pearlGrade,
+    size: product.pearlSizeMm !== null ? `${product.pearlSizeMm} mm` : null,
+    metal: product.setting,
+    type: product.type?.name ?? null,
+    polish: product.polish?.name ?? null,
+    colour: product.pearlColour?.name ?? null,
+    colourHex: product.pearlColour?.hex ?? null,
+    stone: product.stone?.name ?? "No stone",
+    occasions: product.occasions,
+    sold: product.displaySoldCount,
     pearlPassport: {
       grade: product.pearlGrade,
       type: product.pearlType,
       sizeMm: product.pearlSizeMm,
-      colour: product.pearlColour,
+      colour: product.pearlColour?.name ?? null,
       lustre: product.pearlLustre,
       pond: product.pond,
       harvestBatch: product.harvestBatch,
@@ -59,6 +78,10 @@ function toDetail(product: ProductDetail, related: ProductCard[]) {
       setting: product.setting,
       purity: product.purity,
     },
+    // Free-form per-product spec rows (e.g. "Chain Length" on a necklace,
+    // "Post Type" on an earring) — admin sets exactly what applies to this
+    // product, nothing fixed for every product.
+    attributes: product.attributes.map((a) => ({ label: a.label, value: a.value })),
     optionTypes: product.optionTypes.map((o) => o.name),
     variants: product.variants.map((v) => ({
       id: v.id,

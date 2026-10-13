@@ -17,7 +17,9 @@ if (env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
-const corsOrigins = env.CORS_ORIGINS.split(",").map((origin) => origin.trim());
+// Deployed storefront origins are always allowed; CORS_ORIGINS can add more.
+const DEPLOYED_ORIGINS = ["https://eclat-client-frontend.vercel.app"];
+const corsOrigins = [...DEPLOYED_ORIGINS, ...env.CORS_ORIGINS.split(",").map((origin) => origin.trim())];
 // In development Vite moves to the next free port when one is taken, so any localhost origin is accepted.
 // In production only CORS_ORIGINS are.
 const isLocalDev = (origin: string) => env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);

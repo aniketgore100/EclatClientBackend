@@ -6,6 +6,5 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npx prisma generate
-ENV NODE_ENV=production
 EXPOSE 3000
 CMD ["npx", "tsx", "src/server.ts"]

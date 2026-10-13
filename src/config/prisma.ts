@@ -5,10 +5,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
 
 function resolveSslForPasswordMode() {
+  if (env.DATABASE_SSL === "no-verify") return { rejectUnauthorized: false };
+
   const enabled = env.DATABASE_SSL === "require" || (env.DATABASE_SSL === "auto" && env.NODE_ENV === "production");
   if (!enabled) return undefined;
 
-  return { rejectUnauthorized: true };
+  const ca = env.DATABASE_SSL_CA?.replace(/\\n/g, "\n");
+  return { rejectUnauthorized: true, ...(ca ? { ca } : {}) };
 }
 
 function buildPoolConfig(): PoolConfig {

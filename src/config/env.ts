@@ -11,7 +11,10 @@ const envSchema = z
     DATABASE_AUTH_MODE: z.enum(["password", "iam"]).default("password"),
     DATABASE_URL: z.string().min(1).optional(),
 
-    DATABASE_SSL: z.enum(["auto", "require", "disable"]).default("auto"),
+    // "no-verify" keeps the connection encrypted but skips certificate-chain checking (Supabase's pooler chain isn't in Node's trust store).
+    // Prefer DATABASE_SSL_CA (the provider's CA certificate, PEM) with "require" when you can.
+    DATABASE_SSL: z.enum(["auto", "require", "no-verify", "disable"]).default("auto"),
+    DATABASE_SSL_CA: z.string().optional(),
 
     // Only used when DATABASE_AUTH_MODE=iam
     DATABASE_HOST: z.string().optional(),

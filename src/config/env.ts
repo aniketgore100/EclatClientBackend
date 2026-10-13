@@ -30,6 +30,16 @@ const envSchema = z
     OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
     OTP_MAX_PER_WINDOW: z.coerce.number().int().positive().default(5),
     OTP_WINDOW_MINUTES: z.coerce.number().int().positive().default(10),
+
+    // Blank values (the placeholders in .env) count as "not set".
+    RAZORPAY_KEY_ID: z.string().trim().optional().transform((v) => v || undefined),
+    RAZORPAY_KEY_SECRET: z.string().trim().optional().transform((v) => v || undefined),
+    RAZORPAY_WEBHOOK_SECRET: z.string().trim().optional().transform((v) => v || undefined),
+    // Shared secret Shiprocket sends in the `x-api-key` header of its tracking webhook (set the same value
+    // in Shiprocket → Settings → API → Webhooks). Without it the courier webhook refuses every request.
+    SHIPROCKET_WEBHOOK_TOKEN: z.string().trim().optional().transform((v) => v || undefined),
+    // "fake" is a local stand-in for Razorpay used by automated tests; never allowed in production.
+    PAYMENT_GATEWAY: z.enum(["razorpay", "fake"]).default("razorpay"),
   })
   .superRefine((data, ctx) => {
     if (data.DATABASE_AUTH_MODE === "password" && !data.DATABASE_URL) {
@@ -38,6 +48,16 @@ const envSchema = z
         path: ["DATABASE_URL"],
         message: "DATABASE_URL is required when DATABASE_AUTH_MODE=password",
       });
+    }
+    if (data.NODE_ENV === "production") {
+      if (data.PAYMENT_GATEWAY === "fake") {
+        ctx.addIssue({ code: "custom", path: ["PAYMENT_GATEWAY"], message: "PAYMENT_GATEWAY=fake is not allowed in production" });
+      }
+      for (const field of ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET"] as const) {
+        if (!data[field]) {
+          ctx.addIssue({ code: "custom", path: [field], message: `${field} is required in production` });
+        }
+      }
     }
     if (data.DATABASE_AUTH_MODE === "iam") {
       for (const field of ["DATABASE_HOST", "DATABASE_NAME", "DATABASE_USER", "AWS_REGION"] as const) {

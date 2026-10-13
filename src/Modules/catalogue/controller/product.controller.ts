@@ -6,13 +6,16 @@ import { requireParam } from "../../../common/params.js";
 export const productController = {
   async list(req: Request, res: Response) {
     const filters = productListQuerySchema.parse(req.query);
-    const result = await productService.list(filters);
-    res.json(result);
+    res.json({ data: await productService.list(filters) });
   },
 
   async getBySlug(req: Request, res: Response) {
     const slug = requireParam(req, "slug");
-    const product = await productService.getBySlug(slug);
-    res.json({ data: product });
+    res.json({ data: await productService.getBySlug(slug) });
+  },
+
+  async reviews(req: Request, res: Response) {
+    const slug = requireParam(req, "slug");
+    res.json({ data: await productService.reviews(slug) });
   },
 };

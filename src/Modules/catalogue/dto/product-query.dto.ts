@@ -1,23 +1,30 @@
 import { z } from "zod";
 
+// Arrays arrive comma-separated (?category=rings,earrings&metal=gold).
+const csv = z
+  .string()
+  .optional()
+  .transform((v) =>
+    v
+      ? v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+  );
+
 export const productListQuerySchema = z.object({
-  category: z.string().optional(),
-  // Slugs of admin-managed ProductType/Polish/Stone/PearlColour rows —
-  // these are content, not a fixed enum, so any string is syntactically
-  // valid; a slug that matches no row just yields zero results.
-  type: z.string().optional(),
-  polish: z.string().optional(),
-  colour: z.string().optional(),
-  stone: z.string().optional(),
-  occasion: z.string().optional(),
-  tag: z.string().optional(),
-  grade: z.string().optional(),
-  metal: z.string().optional(),
-  minPrice: z.coerce.number().int().nonnegative().optional(),
-  maxPrice: z.coerce.number().int().nonnegative().optional(),
-  inStock: z.coerce.boolean().optional(),
-  isNew: z.coerce.boolean().optional(),
-  sort: z.enum(["popular", "price_asc", "price_desc", "newest", "rating"]).default("popular"),
+  category: csv,
+  collection: csv,
+  metal: csv,
+  size: csv,
+  slugs: csv,
+  // Whole rupees, inclusive — compared against the product's lowest variant price.
+  price_min: z.coerce.number().int().nonnegative().optional(),
+  price_max: z.coerce.number().int().nonnegative().optional(),
+  in_stock: z.enum(["true", "false"]).optional(),
+  q: z.string().trim().optional(),
+  sort: z.enum(["featured", "newest", "price_asc", "price_desc", "rating"]).default("featured"),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(24),
 });

@@ -24,99 +24,18 @@ enum ReviewStatus {
   REJECTED
 }
 
-
-model ProductType {
-  id        String    @id @default(uuid())
-  name      String
-  slug      String    @unique
-  position  Int       @default(0)
-  isActive  Boolean   @default(true)
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("product_types")
-}
-
-model Polish {
-  id        String    @id @default(uuid())
-  name      String
-  slug      String    @unique
-  position  Int       @default(0)
-  isActive  Boolean   @default(true)
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("polishes")
-}
-
-model Stone {
-  id        String    @id @default(uuid())
-  name      String
-  slug      String    @unique
-  position  Int       @default(0)
-  isActive  Boolean   @default(true)
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("stones")
-}
-
-model PearlColour {
-  id        String    @id @default(uuid())
-  name      String
-  slug      String    @unique
-  hex       String?
-  position  Int       @default(0)
-  isActive  Boolean   @default(true)
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("pearl_colours")
-}
-
-// Admin-managed grouping for the Catalogue view's tab bar (e.g. "Live
-// Collection", "Featured Collection") — a new tab can be created from the
-// admin UI at any time, the list is never fixed in code.
-model CategoryTab {
-  id         String     @id @default(uuid())
-  name       String
-  slug       String     @unique
-  position   Int        @default(0)
-  isActive   Boolean    @default(true)
-  categories Category[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-
-  @@map("category_tabs")
-}
-
 model Category {
-  id            String        @id @default(uuid())
-  name          String
-  slug          String        @unique
-  // Home page tile thumbnail (circular crop, e.g. the "Office & daily" tile).
-  image         String?
-  // Hero banner shown at the top of this category's own page — deliberately
-  // a different image from `image` (wide vs. tile-cropped shot).
-  banner        String?
-  description   String?
-  eyebrow       String?
-  title         String?
-  text          String?
-  caption       String?
-  position      Int           @default(0)
-  status        ProductStatus @default(ACTIVE)
-  categoryTabId String?
-  categoryTab   CategoryTab?  @relation(fields: [categoryTabId], references: [id])
-  products      Product[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  image       String?
+  description String?
+  position    Int           @default(0)
+  status      ProductStatus @default(ACTIVE)
+  products    Product[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  @@index([categoryTabId])
   @@map("categories")
 }
 
@@ -129,38 +48,22 @@ model Product {
   subtitle    String?
   description String?
   status      ProductStatus @default(DRAFT)
-  featured    Boolean       @default(false)
-  isNew       Boolean       @default(false)
+  // Storefront collection slugs (e.g. "new-drops", "bestsellers") — a product
+  // belongs to a collection by carrying its slug here.
   tags        String[]      @default([])
+  // "new" | "bestseller" | "limited"
   badges      String[]      @default([])
+  // "Featured" sort order on the storefront — lower comes first.
+  sortOrder   Int           @default(0)
 
-  seoTitle   String?
-  seoMeta    String?
-  seoOgImage String?
+  // Product page accordions. Shipping copy is store-wide, not per product.
+  material String?
+  care     String?
 
-  pearlType     String?
-  pearlGrade    String?
-  pearlSizeMm   Float?
-  pearlColourId String?
-  pearlColour   PearlColour? @relation(fields: [pearlColourId], references: [id])
-  pearlLustre   String?
-  pond          String?
-  harvestBatch  String?
-  monthsInWater Int?
-  setting       String?
-  purity        String?
-  typeId    String?
-  type      ProductType? @relation(fields: [typeId], references: [id])
-  polishId  String?
-  polish    Polish?      @relation(fields: [polishId], references: [id])
-  stoneId   String?
-  stone     Stone?       @relation(fields: [stoneId], references: [id])
-  occasions String[]     @default([])
-
-  displaySoldCount Int?
+  seoTitle String?
+  seoMeta  String?
 
   codAllowed Boolean @default(true)
-  insured    Boolean @default(true)
 
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
@@ -170,15 +73,12 @@ model Product {
   variants    Variant[]
   reviews     Review[]
   attributes  ProductAttribute[]
+  wishlisted  WishlistItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([categoryId])
-  @@index([typeId])
-  @@index([polishId])
-  @@index([stoneId])
-  @@index([pearlColourId])
   @@map("products")
 }
 
@@ -188,6 +88,9 @@ model ProductImage {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   alt       String?
+  // "model" (worn) or "packshot" (on a plain background). The first image is
+  // the storefront card image and should be a model shot.
+  kind      String   @default("packshot")
   position  Int      @default(0)
   variantId String?
   variant   Variant? @relation(fields: [variantId], references: [id])
@@ -235,8 +138,10 @@ model Variant {
   barcode   String?
   status    VariantStatus @default(ACTIVE)
 
-  images    ProductImage[]
-  inventory Inventory?
+  images     ProductImage[]
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
 
   @@index([productId])
   @@map("variants")
@@ -263,16 +168,19 @@ enum AuthProvider {
 }
 
 model Customer {
-  id            String        @id @default(uuid())
-  phone         String        @unique
+  id            String         @id @default(uuid())
+  phone         String         @unique
   email         String?
   name          String?
   dob           DateTime?
-  whatsappOptIn Boolean       @default(false)
-  tags          String[]      @default([])
+  whatsappOptIn Boolean        @default(false)
+  tags          String[]       @default([])
   addresses     Address[]
   reviews       Review[]
   sessions      AuthSession[]
+  cart          Cart?
+  wishlist      WishlistItem[]
+  orders        Order[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -339,6 +247,270 @@ model Address {
   @@map("addresses")
 }
 
+// One cart per customer, created on first use. Guests keep theirs in the browser until login,
+// when it is merged in (see cart.service). Prices are never stored here — a line is just
+// variant + quantity, priced from the variant on every read.
+model Cart {
+  id         String     @id @default(uuid())
+  customerId String     @unique
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items      CartItem[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, variantId])
+  @@index([variantId])
+  @@map("cart_items")
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, productId])
+  @@index([productId])
+  @@map("wishlist_items")
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  ONLINE
+  COD
+}
+
+// All money is in paise. Everything a customer sees on an order (names, prices, address) is
+// snapshotted here, so later catalogue or address edits never rewrite history.
+model Order {
+  id         String   @id @default(uuid())
+  number     String   @unique
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  status        OrderStatus
+  paymentMethod PaymentMethod
+
+  subtotal    Int
+  shippingFee Int
+  codFee      Int
+  total       Int
+  currency    String @default("INR")
+
+  shippingMethod  String
+  contactEmail    String
+  contactPhone    String
+  marketingOptIn  Boolean @default(false)
+  shippingAddress Json
+  giftNote        String?
+
+  // Online orders hold their stock (inventory.reserved) until paid; past this time the hold is released.
+  holdExpiresAt DateTime?
+
+  // Client-generated key for one checkout attempt: a retry of the same attempt returns this order
+  // instead of creating a second one.
+  idempotencyKey String?
+
+  paidAt       DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+
+  // Where the order was placed from, read from the browser's User-Agent at checkout. Null on orders
+  // placed before this was recorded (shown as "Unknown" in the admin).
+  deviceType String? // "mobile" | "tablet" | "desktop"
+  os         String?
+  browser    String?
+  userAgent  String?
+
+  items     OrderItem[]
+  payments  Payment[]
+  shipments Shipment[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([customerId, idempotencyKey])
+  @@index([createdAt])
+  @@index([customerId, createdAt])
+  @@index([status, holdExpiresAt])
+  @@map("orders")
+}
+
+enum PaymentStatus {
+  CREATED
+  CAPTURED
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+// One row per gateway order (Razorpay lets the customer try several times against the same order;
+// the latest attempt's details live here). Amounts are paise.
+model Payment {
+  id                String        @id @default(uuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          String        @default("razorpay")
+  providerOrderId   String        @unique
+  providerPaymentId String?       @unique
+  amount            Int
+  currency          String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  method            String?
+  failureCode       String?
+  failureReason     String?
+  refundId          String?
+  refundedAmount    Int           @default(0)
+  capturedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+// Gateway webhook deliveries already handled, keyed by the provider's event id, so a redelivery is a no-op.
+model WebhookEvent {
+  id          String   @id
+  provider    String
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("webhook_events")
+}
+
+enum ShipmentStatus {
+  CREATED // order exists at the courier platform, no courier yet
+  AWB_ASSIGNED // courier booked, tracking number issued
+  PICKUP_SCHEDULED // courier asked to collect
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  RTO // returning to us
+  CANCELLED
+}
+
+// One shipment of an order at the courier platform (Shiprocket). Creating one is a multi-step,
+// resumable process, so every id and the furthest step reached are saved as they happen.
+model Shipment {
+  id                 String          @id @default(uuid())
+  orderId            String
+  order              Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider           String          @default("shiprocket")
+  providerOrderId    String?         @unique
+  providerShipmentId String?         @unique
+  status             ShipmentStatus  @default(CREATED)
+  // The platform's own wording for the latest status (e.g. "IN TRANSIT"), kept for the admin.
+  rawStatus          String?
+  courierId          Int?
+  courierName        String?
+  awb                String?         @unique
+  labelUrl           String?
+  trackingUrl        String?
+  weightG            Int?
+  dims               Json?
+  freightCharge      Int? // paise, as quoted when the courier was chosen
+  pickupScheduledAt  DateTime?
+  etd                DateTime?
+  deliveredAt        DateTime?
+  lastError          String?
+  // Held briefly while one admin's "ship" is running, so a double-click can't create two parcels.
+  lockedAt           DateTime?
+  events             ShipmentEvent[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@map("shipments")
+}
+
+// Tracking scans, deduplicated by a fingerprint so a webhook redelivery adds nothing.
+model ShipmentEvent {
+  id          String   @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  fingerprint String
+  status      String
+  activity    String?
+  location    String?
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  @@unique([shipmentId, fingerprint])
+  @@index([shipmentId, occurredAt])
+  @@map("shipment_events")
+}
+
+model OrderItem {
+  id           String   @id @default(uuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId    String?
+  variant      Variant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  sku          String
+  name         String
+  slug         String
+  optionsLabel String
+  imageUrl     String?
+  unitPrice    Int
+  quantity     Int
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+enum InventoryMovementType {
+  INITIAL
+  RESERVE
+  RELEASE
+  SALE
+  RESTOCK
+  ADJUSTMENT
+}
+
+// Append-only record of every stock change, so on-hand/reserved can always be explained and
+// reconciled. Deliberately has no FK to variants — history outlives a deleted variant.
+model InventoryMovement {
+  id            String                @id @default(uuid())
+  variantId     String
+  orderId       String?
+  type          InventoryMovementType
+  onHandDelta   Int                   @default(0)
+  reservedDelta Int                   @default(0)
+  note          String?
+  createdAt     DateTime              @default(now())
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+  @@map("inventory_movements")
+}
+
 model Review {
   id         String       @id @default(uuid())
   productId  String
@@ -358,80 +530,44 @@ model Review {
   @@map("reviews")
 }
 
-model Content {
-  key       String   @id
-  json      Json
-  updatedAt DateTime @updatedAt
+// The website's editable content: ONE document holding the homepage sections and the site chrome
+// (announcement bar, menus, footer…). The admin edits `draft`; the storefront serves `published`.
+// Publishing copies draft → published and files the old version in site_revisions, so any publish
+// can be rolled back. `version` is bumped on every draft save so two editors can't silently overwrite
+// each other.
+model SiteContent {
+  id          String    @id // always "site"
+  draft       Json
+  published   Json?
+  version     Int       @default(1)
+  publishedAt DateTime?
+  publishedBy String?
+  updatedBy   String?
+  updatedAt   DateTime  @updatedAt
 
-  @@map("content")
+  @@map("site_content")
 }
 
-// Every homepage (and site-chrome) block, admin-editable. `content`/`settings`
-// are the DRAFT the admin UI edits; `published*` is the mirror the public
-// storefront reads — Publish just copies draft -> published in one write, so
-// there's always a stable live version while a draft is being worked on.
-// HEADER / ANNOUNCEMENT_BAR / FOOTER render on every page (not just home) —
-// the admin UI pins them (no reorder/duplicate/delete), only content edits.
-enum HomepageSectionType {
-  ANNOUNCEMENT_BAR
-  HEADER
-  HERO
-  TRUST_STRIP
-  CATEGORY_NAV
-  HIGHLIGHTS
-  ECLAT_EDIT
-  BANNER
-  OCCASIONS
-  FEATURED_COLLECTION
-  CURATED_EDITS
-  PEARL_MOOD
-  SHOP_THE_LOOK
-  TESTIMONIALS
-  JOURNAL
-  PEARL_GUIDE
-  MOST_SEARCHED
-  NEWSLETTER
-  FOOTER
+model SiteRevision {
+  id          String   @id @default(uuid())
+  snapshot    Json
+  note        String?
+  publishedBy String?
+  publishedAt DateTime @default(now())
+
+  @@index([publishedAt])
+  @@map("site_revisions")
 }
 
-model HomepageSection {
-  id   String              @id @default(uuid())
-  type HomepageSectionType
-  // Stable slug so multiple instances of the same type can coexist (e.g.
-  // three FEATURED_COLLECTION sections: Moonlit / Morning Dew / Tide).
-  key  String              @unique
-  name String
-
-  order    Int     @default(0)
-  enabled  Boolean @default(true)
-  content  Json
-  settings Json?
-
-  publishedOrder    Int?
-  publishedEnabled  Boolean?
-  publishedContent  Json?
-  publishedSettings Json?
-  publishedAt       DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([type])
-  @@map("homepage_sections")
-}
-
-// Lets the admin "Preview" button open the real storefront showing DRAFT
-// content instead of the published homepage — a random, short-lived token
-// row both backends can see (they share this database), so no secret needs
-// to be coordinated between the two separate services.
-model HomepagePreviewToken {
+// Lets the admin's Preview button open the real storefront showing the DRAFT. Short-lived and random;
+// both backends share the database so no secret has to be coordinated between them.
+model SitePreviewToken {
   token     String   @id @default(uuid())
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  @@map("homepage_preview_tokens")
+  @@map("site_preview_tokens")
 }
-
 
 enum AdminRole {
   OWNER
